@@ -1,0 +1,22 @@
+[project]
+name = "trading-grid-unified"
+version = "1.0.0"
+description = "Unified grid trading system - A-shares (miniQMT) + HK/US (FUTU OpenD)"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "python-dotenv==1.0.1",
+    "pandas==2.2.3",
+    "numpy==2.2.1",
+    "pydantic==2.10.4",
+    "websockets==14.1",
+]
+
+[project.optional-dependencies]
+futu = ["futu-api==9.1.6108"]
+qmt = []  # xtquant installed separately via QMT client
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
