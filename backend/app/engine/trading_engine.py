@@ -235,8 +235,7 @@ class TradingEngine:
                 qmt = get_qmt_broker()
                 if hasattr(qmt, 'set_order_callback'):
                     qmt.set_order_callback(self._on_order_update)
-                if hasattr(qmt, 'start_xtdata_daemon'):
-                    qmt.start_xtdata_daemon()
+                # 注意: start_xtdata_daemon 是阻塞的，移到订阅行情之后在后台线程启动
             except Exception as e:
                 logger.warning(f"QMT 订单回调设置失败: {e}")
 
@@ -265,6 +264,15 @@ class TradingEngine:
             try:
                 broker = get_qmt_broker()
                 broker.subscribe_quotes(qmt_codes, self._on_quote_update)
+                # xtdata.run() 是阻塞调用，必须在后台线程启动
+                if hasattr(broker, 'start_xtdata_daemon'):
+                    import threading
+                    t = threading.Thread(
+                        target=broker.start_xtdata_daemon,
+                        name="xtdata-daemon",
+                        daemon=True,
+                    )
+                    t.start()
             except Exception as e:
                 logger.error(f"QMT 行情订阅失败: {e}")
 
