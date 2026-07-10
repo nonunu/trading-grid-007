@@ -1,4 +1,14 @@
+# ==================== General ====================
+TRADING_ENV=REAL  # SIMULATE or REAL
+DB_PATH=./trading_grid.db
 
+# ==================== FUTU OpenD (HK/US) ====================
+FUTU_OPEND_HOST=43.154.136.247
+FUTU_OPEND_PORT=11111
+FUTU_TRADING_PWD=878823
+FUTU_RSA_KEY_PATH=./futu_opend_rsa.key
 
-2026-07-10 13:51:32 ERROR: [QMT] 诊断: 账户查询失败, 交易通道可能断开, 请检查QMT客户端是否已登录并连接交易服务器
-2026-07-10 13:51:32 ERROR: place_order failed: 600863.SH BUY price=4.05 qty=2500
+# ==================== miniQMT (A-shares) ====================
+QMT_PATH=D:\zhaosl_install\东北证券NET专业版\userdata_mini
+QMT_ACCOUNT=20177065
+QMT_SESSION_ID=999999
