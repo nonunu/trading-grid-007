@@ -102,8 +102,22 @@
                   <el-table-column label="父ID" width="50">
                     <template #default="{ row }">{{ row.parent_cell_id || '-' }}</template>
                   </el-table-column>
-                  <el-table-column prop="price" label="价格" width="90" sortable />
-                  <el-table-column prop="qty" label="数量" width="70" />
+                  <el-table-column label="价格" width="100" sortable sort-by="price">
+                    <template #default="{ row }">
+                      <el-input-number v-if="isCellEditable(row)" v-model="row.price"
+                        :min="0.001" :step="0.01" :precision="3" :controls="false" size="small"
+                        style="width: 85px" />
+                      <span v-else>{{ row.price?.toFixed(3) }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="数量" width="85">
+                    <template #default="{ row }">
+                      <el-input-number v-if="isCellEditable(row)" v-model="row.qty"
+                        :min="1" :step="100" :controls="false" size="small"
+                        style="width: 70px" />
+                      <span v-else>{{ row.qty }}</span>
+                    </template>
+                  </el-table-column>
                   <el-table-column label="订单状态" width="110">
                     <template #default="{ row }">
                       <span v-if="row.order_status">{{ row.order_status }}</span>
@@ -116,8 +130,13 @@
                   <el-table-column label="成交均价" width="85">
                     <template #default="{ row }">{{ row.dealt_avg_price ? row.dealt_avg_price.toFixed(3) : '-' }}</template>
                   </el-table-column>
-                  <el-table-column label="分配量" width="65">
-                    <template #default="{ row }">{{ row.allocated_qty || 0 }}</template>
+                  <el-table-column label="分配量" width="75">
+                    <template #default="{ row }">
+                      <el-input-number v-if="isCellEditable(row)" v-model="row.allocated_qty"
+                        :min="0" :step="100" :controls="false" size="small"
+                        style="width: 60px" />
+                      <span v-else>{{ row.allocated_qty || 0 }}</span>
+                    </template>
                   </el-table-column>
                 </el-table>
 
@@ -510,8 +529,42 @@ async function onRestore() {
 }
 
 // Save edits
+function isCellEditable(row: Cell): boolean {
+  // 可编辑条件: 没有活跃订单，或者订单已完结
+  const editableStatuses = [null, undefined, '', 'FILLED_ALL', 'CANCELLED_PART', 'TRANSFERRED']
+  return editableStatuses.includes(row.order_status as string)
+}
+
 async function onSaveCellEdits() {
-  ElMessage.info('单元格数据通过表格直接编辑后，请使用各操作按钮保存')
+  if (!currentStock.value || !filteredCells.value.length) {
+    ElMessage.warning('没有可保存的数据')
+    return
+  }
+
+  // 收集所有可编辑行的当前值
+  const updates: Record<number, { price?: number; qty?: number; allocated_qty?: number }> = {}
+  for (const cell of filteredCells.value) {
+    if (isCellEditable(cell)) {
+      updates[cell.id] = {
+        price: cell.price,
+        qty: cell.qty,
+        allocated_qty: cell.allocated_qty || 0,
+      }
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    ElMessage.info('没有可保存的修改')
+    return
+  }
+
+  try {
+    const res = await api.post('/cells/batch_update', { updates }) as { success: boolean; updated_count: number }
+    ElMessage.success(`保存成功，更新了 ${res.updated_count} 个单元格`)
+    await loadCells()
+  } catch {
+    ElMessage.error('保存失败')
+  }
 }
 
 // Split

@@ -195,15 +195,19 @@ class QmtBroker(BrokerClient):
                 # -1 通常表示: 未连接/参数错误/账户未订阅/交易时间外
                 logger.error(
                     f"[QMT] 下单失败: {stock_code} {side} "
-                    f"price={price} qty={qty} result={order_id} "
-                    f"(可能原因: miniQMT未登录/账户未订阅/非交易时间/参数异常)"
+                    f"price={price} qty={qty} result={order_id}"
                 )
-                # 尝试检测连接状态
+                # 诊断: 查询账户资产判断交易通道是否正常
                 try:
-                    connect_status = self._trader.connect()
-                    logger.error(f"[QMT] 当前连接状态检测: connect()={connect_status}")
-                except Exception:
-                    pass
+                    asset = self._trader.query_stock_asset(self._account)
+                    if asset:
+                        logger.error(f"[QMT] 诊断: 账户查询正常 (cash={asset.cash}), "
+                                     f"可能是QMT客户端交易服务器未连接或股票代码/数量不合规")
+                    else:
+                        logger.error(f"[QMT] 诊断: 账户查询失败, 交易通道可能断开, "
+                                     f"请检查QMT客户端是否已登录并连接交易服务器")
+                except Exception as diag_e:
+                    logger.error(f"[QMT] 诊断异常: {diag_e}")
                 return None
 
         except Exception as e:
