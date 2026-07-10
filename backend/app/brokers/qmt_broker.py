@@ -165,12 +165,19 @@ class QmtBroker(BrokerClient):
                     price: float, qty: int,
                     remark: str = '') -> Optional[str]:
         if not self._connected:
+            logger.error(f"[QMT] 下单失败: 未连接")
             return None
 
         try:
             _lazy_import()
             order_type = (xtconstant.STOCK_BUY if side == 'BUY'
                          else xtconstant.STOCK_SELL)
+
+            # 确保类型正确 (miniQMT 对类型敏感，numpy int64/float 会导致返回 -1)
+            price = float(price)
+            qty = int(qty)
+
+            logger.info(f"[QMT] 下单请求: {stock_code} {side} price={price} qty={qty}")
 
             order_id = self._trader.order_stock(
                 self._account, stock_code, order_type,
@@ -180,15 +187,23 @@ class QmtBroker(BrokerClient):
 
             if order_id and order_id > 0:
                 logger.info(
-                    f"QMT 下单成功: {stock_code} {side} "
+                    f"[QMT] 下单成功: {stock_code} {side} "
                     f"price={price} qty={qty} order_id={order_id}"
                 )
                 return str(order_id)
             else:
+                # -1 通常表示: 未连接/参数错误/账户未订阅/交易时间外
                 logger.error(
-                    f"QMT 下单失败: {stock_code} {side} "
-                    f"price={price} qty={qty} result={order_id}"
+                    f"[QMT] 下单失败: {stock_code} {side} "
+                    f"price={price} qty={qty} result={order_id} "
+                    f"(可能原因: miniQMT未登录/账户未订阅/非交易时间/参数异常)"
                 )
+                # 尝试检测连接状态
+                try:
+                    connect_status = self._trader.connect()
+                    logger.error(f"[QMT] 当前连接状态检测: connect()={connect_status}")
+                except Exception:
+                    pass
                 return None
 
         except Exception as e:
