@@ -286,7 +286,21 @@ class QmtBroker(BrokerClient):
             if not self._quote_callback:
                 return
             for code, tick_data in datas.items():
-                price = tick_data.get('lastPrice')
+                # tick_data 格式: {field: [values...]}，取最后一个值
+                if isinstance(tick_data, dict):
+                    last_price_list = tick_data.get('lastPrice')
+                    if isinstance(last_price_list, list) and last_price_list:
+                        price = last_price_list[-1]
+                    elif isinstance(last_price_list, (int, float)):
+                        price = last_price_list
+                    else:
+                        continue
+                elif isinstance(tick_data, list) and tick_data:
+                    # 某些版本可能直接传 list of tick
+                    last_tick = tick_data[-1] if tick_data else {}
+                    price = last_tick.get('lastPrice', 0) if isinstance(last_tick, dict) else 0
+                else:
+                    continue
                 if price and price > 0:
                     self._quote_callback(code, float(price))
 
