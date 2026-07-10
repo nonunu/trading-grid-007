@@ -1,3 +1,4 @@
-2026-07-10 13:40:05 ERROR: [QMT] 下单失败: 600863.SH BUY price=4.05 qty=2500 result=-1 (可能原因: miniQMT未登录/账户未订阅/非交易时间/参数异常)
-2026-07-10 13:40:05 ERROR: [QMT] 当前连接状态检测: connect()=0
-2026-07-10 13:40:05 ERROR: place_order failed: 600863.SH BUY price=4.05 qty=2500
+
+
+2026-07-10 13:51:32 ERROR: [QMT] 诊断: 账户查询失败, 交易通道可能断开, 请检查QMT客户端是否已登录并连接交易服务器
+2026-07-10 13:51:32 ERROR: place_order failed: 600863.SH BUY price=4.05 qty=2500
