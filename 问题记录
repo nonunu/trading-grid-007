@@ -1,23 +1,7 @@
---- 部署后端 ---
-使用 conda 环境: py39
-[ERROR] conda 环境中未找到 python: C:\Users\sixqi\.condavs\py39/bin/python
-
-
-2026-07-10 13:01:59 INFO: [QMT] 行情连接成功 (xtdata)
-2026-07-10 13:01:59 INFO: [QMT] miniQMT 全部连接完成 ✓
-2026-07-10 13:01:59 INFO: QMT Broker 连接成功
-2026-07-10 13:01:59 INFO:   futu: 成功 ✓
-2026-07-10 13:01:59 INFO:   qmt: 成功 ✓
-2026-07-10 13:01:59 INFO: ==================================================
-2026-07-10 13:01:59 INFO: 初始化策略...
-2026-07-10 13:01:59 INFO: 300635.SZ MULTI init: MULTI unfinished=0
-2026-07-10 13:01:59 INFO: HK.06998 MULTI init: MULTI unfinished=0
-2026-07-10 13:01:59 INFO: HK.06998 SHORT init: SHORT unfinished=0
-2026-07-10 13:02:00 INFO: HK.07666 MULTI init: MULTI unfinished=0
-2026-07-10 13:02:00 INFO: HK.07666 SHORT init: SHORT unfinished=0
-2026-07-10 13:02:00 INFO: HK.08017 MULTI init: MULTI unfinished=0
-2026-07-10 13:02:00 INFO: HK.08017 SHORT init: SHORT unfinished=1
-2026-07-10 13:02:00 INFO: 注册订单回调...
-2026-07-10 13:02:00 INFO: FUTU 订单回调已注册
-2026-07-10 13:02:00 INFO: [QMT] 交易回调已注册 (委托回报/成交回报/异常回报)
-点击启动按钮输出上面日志后，还是可以点击状态，是卡住了，还是未启动
+subscribe callback error: <function QmtBroker.subscribe_quotes.<locals>._on_quote at 0x0000025873ECF790>
+Traceback (most recent call last):
+  File "C:\Users\sixqi\.conda\envs\py39\lib\site-packages\xtquant\xtdata.py", line 1159, in subscribe_callback
+    callback(datas)
+  File "D:\zhaosl_workspace\trading-grid-007\backend\app\brokers\qmt_broker.py", line 289, in _on_quote
+    price = tick_data.get('lastPrice')
+AttributeError: 'list' object has no attribute 'get'
