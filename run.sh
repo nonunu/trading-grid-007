@@ -146,10 +146,13 @@ fi
 
 cd "$BACKEND_DIR"
 
-# 确定当前 Python 解释器路径
-# conda 环境中可能只有 python 而没有 python3 链接，优先用 $CONDA_PREFIX/bin/python
+# 确定当前 Python 解释器路径 (兼容 Linux/macOS 和 Windows)
 if [ -n "$CONDA_PREFIX" ] && [ -x "$CONDA_PREFIX/bin/python" ]; then
     PYTHON_BIN="$CONDA_PREFIX/bin/python"
+elif [ -n "$CONDA_PREFIX" ] && [ -x "$CONDA_PREFIX/python.exe" ]; then
+    PYTHON_BIN="$CONDA_PREFIX/python.exe"
+elif [ -n "$CONDA_PREFIX" ] && [ -x "$CONDA_PREFIX/python" ]; then
+    PYTHON_BIN="$CONDA_PREFIX/python"
 elif command -v python &>/dev/null && python -c "import sys; sys.exit(0 if sys.prefix != sys.base_prefix or 'conda' in sys.prefix else 1)" 2>/dev/null; then
     PYTHON_BIN=$(which python)
 else

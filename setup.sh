@@ -60,10 +60,15 @@ if [ -n "$CONDA_ENV" ]; then
         error "conda 环境 '$CONDA_ENV' 不存在。可用环境: $(conda env list | grep -v '^#')"
     fi
 
-    # 确定 conda 环境内的 python
-    PYTHON_BIN="$CONDA_PREFIX/bin/python"
-    if [ ! -x "$PYTHON_BIN" ]; then
-        error "conda 环境中未找到 python: $PYTHON_BIN"
+    # 确定 conda 环境内的 python (兼容 Linux/macOS 和 Windows)
+    if [ -x "$CONDA_PREFIX/bin/python" ]; then
+        PYTHON_BIN="$CONDA_PREFIX/bin/python"
+    elif [ -x "$CONDA_PREFIX/python.exe" ]; then
+        PYTHON_BIN="$CONDA_PREFIX/python.exe"
+    elif [ -x "$CONDA_PREFIX/python" ]; then
+        PYTHON_BIN="$CONDA_PREFIX/python"
+    else
+        error "conda 环境中未找到 python: $CONDA_PREFIX"
     fi
     success "已激活 conda 环境: $CONDA_ENV ($($PYTHON_BIN --version 2>&1))"
 else
