@@ -55,6 +55,10 @@ class TradingEngine:
                 if not success:
                     return False
                 self._initialized = True
+            else:
+                # 非首次启动: 重新加载配置和策略数据
+                logger.info("重新加载配置数据...")
+                self.reload_data()
 
             self.running = True
             logger.info("网格交易系统启动成功！")
@@ -130,36 +134,49 @@ class TradingEngine:
 
         logger.info(f"加载了 {len(configs)} 个股票配置, 涉及市场: {markets_needed}")
 
-        # 2. 连接所需 Broker
+        # 2. 连接所需 Broker (各自独立，互不影响)
         logger.info("=" * 50)
         logger.info("开始连接券商...")
         results = connect_all_brokers(markets_needed)
+        connected_markets = set()
         for broker_name, connected in results.items():
             status = "成功 ✓" if connected else "失败 ✗"
             logger.info(f"  {broker_name}: {status}")
+            if connected:
+                if broker_name == 'futu':
+                    connected_markets.update(Market.FUTU_MARKETS)
+                elif broker_name == 'qmt':
+                    connected_markets.update(Market.A_SHARE_MARKETS)
         logger.info("=" * 50)
 
-        any_connected = any(results.values()) if results else True
-        if not any_connected:
-            logger.error("所有 Broker 连接失败")
+        if not connected_markets:
+            logger.error("所有 Broker 连接失败，无法启动")
             return False
 
-        # 3. 创建策略实例
+        # 3. 只对已连接 broker 对应的股票创建策略
+        active_configs = [c for c in configs if c['market'] in connected_markets]
+        skipped_configs = [c for c in configs if c['market'] not in connected_markets]
+        if skipped_configs:
+            skipped_codes = [c['stock_code'] for c in skipped_configs]
+            logger.warning(f"以下股票因券商未连接而跳过: {skipped_codes}")
+
         logger.info("初始化策略...")
-        self._init_strategies(configs)
+        self._init_strategies(active_configs)
 
-        # 4. 设置订单回调
+        # 4. 只对已连接的市场设置订单回调
         logger.info("注册订单回调...")
-        self._setup_order_callbacks(markets_needed)
+        self._setup_order_callbacks(connected_markets)
 
-        # 5. 订阅行情
+        # 5. 只对已连接的市场订阅行情
         logger.info("订阅行情...")
-        self._subscribe_quotes(configs)
+        self._subscribe_quotes(active_configs)
 
         logger.info("=" * 50)
         logger.info("交易系统初始化完成:")
         logger.info(f"  券商连接: {results}")
-        logger.info(f"  监控股票: {[c['stock_code'] for c in configs]}")
+        logger.info(f"  监控股票: {[c['stock_code'] for c in active_configs]}")
+        if skipped_configs:
+            logger.info(f"  跳过股票: {[c['stock_code'] for c in skipped_configs]}")
         logger.info(f"  策略数量: {sum(1 for c in self._stock_grids.values() if c.get('multi_strategy') or c.get('short_strategy'))}")
         logger.info("=" * 50)
 

@@ -18,23 +18,30 @@ logger = logging.getLogger(__name__)
 
 
 # 过滤高频轮询接口的访问日志，避免刷屏
-class _QuietHealthFilter(logging.Filter):
+class _QuietAccessFilter(logging.Filter):
     """正常 200 响应的 API 请求不输出访问日志，只有非 200 响应才输出"""
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
-        # 所有正常的 200 请求都不打印
-        if '200 OK' in msg:
+        if '200' in msg:
             return False
         return True
 
 
-logging.getLogger("uvicorn.access").addFilter(_QuietHealthFilter())
+# 对所有可能的 uvicorn access logger 都加过滤器
+for _logger_name in ('uvicorn.access', 'uvicorn'):
+    _l = logging.getLogger(_logger_name)
+    _l.addFilter(_QuietAccessFilter())
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
+    # 确保 uvicorn 启动后过滤器仍然生效
+    for _name in ('uvicorn.access', 'uvicorn'):
+        _lg = logging.getLogger(_name)
+        _lg.addFilter(_QuietAccessFilter())
+
     # 启动时初始化
     logger.info("正在初始化交易系统...")
 

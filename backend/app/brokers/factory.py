@@ -79,16 +79,24 @@ def connect_all_brokers(markets: set) -> Dict[str, bool]:
     need_qmt = bool(markets & Market.A_SHARE_MARKETS)
 
     if need_futu:
-        broker = get_futu_broker()
-        results['futu'] = broker.connect()
+        try:
+            broker = get_futu_broker()
+            results['futu'] = broker.connect()
+        except Exception as e:
+            logger.error(f"FUTU Broker 连接异常: {e}")
+            results['futu'] = False
         if results['futu']:
             logger.info("FUTU Broker 连接成功")
         else:
             logger.error("FUTU Broker 连接失败")
 
     if need_qmt:
-        broker = get_qmt_broker()
-        results['qmt'] = broker.connect()
+        try:
+            broker = get_qmt_broker()
+            results['qmt'] = broker.connect()
+        except Exception as e:
+            logger.error(f"QMT Broker 连接异常: {e}")
+            results['qmt'] = False
         if results['qmt']:
             logger.info("QMT Broker 连接成功")
         else:

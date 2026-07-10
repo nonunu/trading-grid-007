@@ -161,6 +161,48 @@ class QmtBroker(BrokerClient):
                 return True
         return False
 
+    def _ensure_trade_connected(self) -> bool:
+        """确保交易通道可用，断开时自动重连"""
+        try:
+            asset = self._trader.query_stock_asset(self._account)
+            if asset:
+                return True
+        except Exception:
+            pass
+
+        # 交易通道断开，尝试重连
+        logger.warning("[QMT] 交易通道已断开，正在自动重连...")
+        with self._lock:
+            try:
+                _lazy_import()
+                # 停止旧的 trader
+                try:
+                    self._trader.stop()
+                except Exception:
+                    pass
+
+                # 重新创建并连接
+                self._trader = XtQuantTrader(QMT_PATH, QMT_SESSION_ID)
+                self._account = StockAccount(QMT_ACCOUNT)
+                self._trader.start()
+
+                connect_result = self._trader.connect()
+                if connect_result != 0:
+                    logger.error(f"[QMT] 重连失败: connect()={connect_result}")
+                    return False
+
+                subscribe_result = self._trader.subscribe(self._account)
+                logger.info(f"[QMT] 重连成功: subscribe()={subscribe_result}")
+
+                # 重新注册回调
+                if self._order_callback:
+                    self.set_order_callback(self._order_callback)
+
+                return True
+            except Exception as e:
+                logger.error(f"[QMT] 重连异常: {e}")
+                return False
+
     def place_order(self, stock_code: str, side: str,
                     price: float, qty: int,
                     remark: str = '') -> Optional[str]:
@@ -192,26 +234,29 @@ class QmtBroker(BrokerClient):
                 )
                 return str(order_id)
             else:
-                # -1 通常表示: 未连接/参数错误/账户未订阅/交易时间外
+                # 下单失败，尝试重连后重试一次
+                logger.warning(f"[QMT] 下单返回 {order_id}，尝试重连后重试...")
+                if self._ensure_trade_connected():
+                    order_id = self._trader.order_stock(
+                        self._account, stock_code, order_type,
+                        qty, xtconstant.FIX_PRICE, price,
+                        'grid', remark
+                    )
+                    if order_id and order_id > 0:
+                        logger.info(
+                            f"[QMT] 重连后下单成功: {stock_code} {side} "
+                            f"price={price} qty={qty} order_id={order_id}"
+                        )
+                        return str(order_id)
+
                 logger.error(
-                    f"[QMT] 下单失败: {stock_code} {side} "
+                    f"[QMT] 下单最终失败: {stock_code} {side} "
                     f"price={price} qty={qty} result={order_id}"
                 )
-                # 诊断: 查询账户资产判断交易通道是否正常
-                try:
-                    asset = self._trader.query_stock_asset(self._account)
-                    if asset:
-                        logger.error(f"[QMT] 诊断: 账户查询正常 (cash={asset.cash}), "
-                                     f"可能是QMT客户端交易服务器未连接或股票代码/数量不合规")
-                    else:
-                        logger.error(f"[QMT] 诊断: 账户查询失败, 交易通道可能断开, "
-                                     f"请检查QMT客户端是否已登录并连接交易服务器")
-                except Exception as diag_e:
-                    logger.error(f"[QMT] 诊断异常: {diag_e}")
                 return None
 
         except Exception as e:
-            logger.error(f"QMT 下单异常: {stock_code} {e}", exc_info=True)
+            logger.error(f"[QMT] 下单异常: {stock_code} {e}", exc_info=True)
             return None
 
     def cancel_order(self, order_id: str) -> bool:
@@ -349,6 +394,7 @@ class QmtBroker(BrokerClient):
         if not self._connected:
             return
 
+        self._order_callback = callback
         _lazy_import()
         broker_self = self
 

@@ -140,14 +140,32 @@ class BaseGridStrategy:
             (self.grid.data['parent_cell_id'].isna()) &
             (self.grid.data['order_id'].isnull())
         )
-        primary_records = self.grid.query_records(primary_condition).sort_values(
-            'price', ascending=self.primary_sort_asc
-        ).head(self._get_primary_count())
+        primary_records = self.grid.query_records(primary_condition)
 
+        if len(primary_records) == 0 and len(self.grid.data) > 0:
+            # 诊断: 为什么没有可下单的父单元格
+            all_parents = self.grid.data[
+                (self.grid.data['cell_type'] == self.parent_cell_type) &
+                (self.grid.data['parent_cell_id'].isna())
+            ]
+            has_order = all_parents[all_parents['order_id'].notna()]
+            if len(all_parents) > 0 and len(has_order) < len(all_parents):
+                # 有未下单的父单元格但不满足条件，才打印诊断
+                logger.debug(
+                    f"{self.code} {self.strategy_type} 主交易无候选: "
+                    f"grid总行数={len(self.grid.data)}, "
+                    f"{self.parent_cell_type}父单元格={len(all_parents)}, "
+                    f"已有订单={len(has_order)}"
+                )
+
+        # 先过滤 scope 范围内，再排序取前 N 个
         if len(primary_records) > 0:
-            for row in primary_records.to_dict('records'):
-                if abs(cur_price - row['price']) > place_order_scope:
-                    continue
+            in_scope = primary_records[
+                (primary_records['price'] - cur_price).abs() <= place_order_scope
+            ].sort_values('price', ascending=self.primary_sort_asc
+            ).head(self._get_primary_count())
+
+            for row in in_scope.to_dict('records'):
                 self._place_order(row, is_primary=True)
                 if self.trade_side_primary == TradeSide.BUY:
                     buy_placed += 1
@@ -170,11 +188,15 @@ class BaseGridStrategy:
             (self.grid.data['order_id'].isnull())
         )
         secondary_candidates = self.grid.query_records(secondary_condition)
+        all_child_count = len(secondary_candidates)
 
         if len(secondary_candidates) > 0:
+            # 过滤: 父单元格必须在 SUCCESS 状态
             secondary_candidates = secondary_candidates[
                 secondary_candidates['parent_cell_id'].isin(success_parent_ids)
             ]
+            parent_matched_count = len(secondary_candidates)
+
             valid_rows = []
             for row in secondary_candidates.to_dict('records'):
                 parent_id = row['parent_cell_id']
@@ -183,18 +205,33 @@ class BaseGridStrategy:
                     valid_rows.append(row)
 
             valid_df = pd.DataFrame(valid_rows)
+            skipped_scope = 0
             if len(valid_df) > 0:
-                valid_df = valid_df.sort_values(
-                    'price', ascending=self.secondary_sort_asc
+                # 先过滤 scope 范围内，再排序取前 N 个
+                in_scope_df = valid_df[
+                    (valid_df['price'] - cur_price).abs() <= place_order_scope
+                ].sort_values('price', ascending=self.secondary_sort_asc
                 ).head(self._get_secondary_count())
-                for row in valid_df.to_dict('records'):
-                    if abs(cur_price - row['price']) > place_order_scope:
-                        continue
+
+                for row in in_scope_df.to_dict('records'):
                     self._place_order(row, is_primary=False)
                     if self.trade_side_secondary == TradeSide.BUY:
                         buy_placed += 1
                     else:
                         sell_placed += 1
+
+                skipped_scope = len(valid_df) - len(in_scope_df)
+
+            # 诊断: 如果有子单元格但没有下单，输出原因
+            if (buy_placed + sell_placed) == 0 and all_child_count > 0:
+                logger.debug(
+                    f"{self.code} {self.strategy_type} 子单元格未下单诊断: "
+                    f"待下子单元格={all_child_count}, "
+                    f"父成交匹配={parent_matched_count}, "
+                    f"qty有效={len(valid_rows)}, "
+                    f"scope内={len(valid_df) - skipped_scope if len(valid_df) > 0 else 0}, "
+                    f"scope外跳过={skipped_scope}"
+                )
 
         # 撤单
         self.cancel_order(cur_price, place_order_scope)
@@ -246,11 +283,8 @@ class BaseGridStrategy:
                 ['order_id', 'order_status', 'create_time'],
                 [order_id, SUBMITTED, now]
             )
-            logger.info(f"place_order: {self.code} {side} "
-                       f"price={price} qty={qty} order_id={order_id}")
         else:
-            logger.error(f"place_order failed: {self.code} "
-                        f"{side} price={price} qty={qty}")
+            logger.error(f"{self.code} 下单失败: {side} price={price} qty={qty}")
 
     # ==================== 订单状态处理 ====================
 

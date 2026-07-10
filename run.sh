@@ -172,7 +172,7 @@ if ! "$PYTHON_BIN" -c "import uvicorn" 2>/dev/null; then
     echo -e "${GREEN}[OK]${NC} $success_msg"
 fi
 
-"$PYTHON_BIN" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+"$PYTHON_BIN" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --no-access-log &
 BACKEND_PID=$!
 echo "$BACKEND_PID" > "$BACKEND_PID_FILE"
 echo -e "${GREEN}[OK]${NC} 后端启动成功 (PID: $BACKEND_PID, Port: 8000)"
